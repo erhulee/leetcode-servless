@@ -4,44 +4,23 @@ const logger = require("koa-logger");
 const bodyParser = require("koa-bodyparser");
 const fs = require("fs");
 const path = require("path");
+const cors = require('@koa/cors');
 const { init: initDB, Counter } = require("./db");
+const { default: axios } = require("axios");
 
 const router = new Router();
-
-const homePage = fs.readFileSync(path.join(__dirname, "index.html"), "utf-8");
-
-// 首页
-router.get("/", async (ctx) => {
-  ctx.body = homePage;
-});
-
-// 更新计数
-router.post("/api/count", async (ctx) => {
-  const { request } = ctx;
-  const { action } = request.body;
-  if (action === "inc") {
-    await Counter.create();
-  } else if (action === "clear") {
-    await Counter.destroy({
-      truncate: true,
-    });
+router.get("/calendar",async (ctx)=>{
+  const {request} = ctx;
+  const query = request.query;
+  const userName = query.name;
+  const a = {"query":"\n    query userProfileCalendar($userSlug: String!, $year: Int) {\n  userCalendar(userSlug: $userSlug, year: $year) {\n    streak\n    totalActiveDays\n    submissionCalendar\n  }\n}\n    ","variables":{"userSlug":userName}};
+  const data = await axios.post("https://leetcode.cn/graphql/noj-go/",a);
+  ctx.body = {
+    data:data.data
   }
 
-  ctx.body = {
-    code: 0,
-    data: await Counter.count(),
-  };
-});
+})
 
-// 获取计数
-router.get("/api/count", async (ctx) => {
-  const result = await Counter.count();
-
-  ctx.body = {
-    code: 0,
-    data: result,
-  };
-});
 
 // 小程序调用，获取微信 Open ID
 router.get("/api/wx_openid", async (ctx) => {
@@ -52,10 +31,12 @@ router.get("/api/wx_openid", async (ctx) => {
 
 const app = new Koa();
 app
+  .use(cors())
   .use(logger())
   .use(bodyParser())
   .use(router.routes())
-  .use(router.allowedMethods());
+  .use(router.allowedMethods())
+
 
 const port = process.env.PORT || 80;
 async function bootstrap() {
